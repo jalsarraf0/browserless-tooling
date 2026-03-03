@@ -148,3 +148,13 @@ Crafted and maintained by the Browserless Tooling contributors — blending
 DevOps rigour, security hardening, and developer ergonomics to ship automation
 that can survive production. Looking to extend the stack (metrics ingestion,
 policy tooling, dashboards)? Open an issue or reach out through the repository.
+
+## Validation Status (2026-03-03)
+
+- Regression status: PASS
+- Commands validated:
+  - `bash -n aibrowse-setup.sh browsewrap-setup.sh`
+  - `sudo bash ./aibrowse-setup.sh <instance>` + metrics/smoke checks
+  - `sudo bash ./browsewrap-setup.sh <instance>` + `/healthz` verification
+- CI/CD status: batched regression, security, and release workflows are defined.
+- Security hygiene: PASS (no hardcoded secrets or private keys detected in tracked files).

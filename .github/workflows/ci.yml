@@ -1,0 +1,81 @@
+name: Regression CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: browserless-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression (${{ matrix.batch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        batch: ["static", "integration"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install lint tooling
+        if: matrix.batch == 'static'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Static regression (bash syntax + shellcheck)
+        if: matrix.batch == 'static'
+        run: |
+          set -euo pipefail
+          bash -n aibrowse-setup.sh
+          bash -n browsewrap-setup.sh
+          shellcheck aibrowse-setup.sh browsewrap-setup.sh
+
+      - name: Full integration regression
+        if: matrix.batch == 'integration'
+        run: |
+          set -Eeuo pipefail
+          INSTANCE="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          cleanup() {
+            sudo docker rm -f "browserless-${INSTANCE}" >/dev/null 2>&1 || true
+            sudo docker rm -f "browsewrap-${INSTANCE}" >/dev/null 2>&1 || true
+            sudo rm -rf "/docker/aibrowse/${INSTANCE}" "/docker/browsewrap/${INSTANCE}" || true
+          }
+          trap cleanup EXIT
+
+          sudo bash ./aibrowse-setup.sh "${INSTANCE}"
+
+          AIBROWSE_ENV="/docker/aibrowse/${INSTANCE}/.env"
+          BROWSERLESS_PORT="$(sudo grep '^BROWSERLESS_PORT=' "${AIBROWSE_ENV}" | cut -d= -f2-)"
+          BROWSERLESS_TOKEN="$(sudo grep '^BROWSERLESS_TOKEN=' "${AIBROWSE_ENV}" | cut -d= -f2-)"
+
+          curl -fsS "http://localhost:${BROWSERLESS_PORT}/metrics?token=${BROWSERLESS_TOKEN}" >/dev/null
+
+          SMOKE_IMG="/docker/aibrowse/${INSTANCE}/downloads/smoke-test.png"
+          test -f "${SMOKE_IMG}"
+          test "$(stat -c '%s' "${SMOKE_IMG}")" -gt 1024
+
+          sudo bash ./browsewrap-setup.sh "${INSTANCE}"
+
+          WRAP_ENV="/docker/browsewrap/${INSTANCE}/.env"
+          WRAPPER_PORT="$(sudo grep '^WRAPPER_PORT=' "${WRAP_ENV}" | cut -d= -f2-)"
+          python3 - <<PY
+          import json
+          import urllib.request
+
+          port = "${WRAPPER_PORT}"
+          with urllib.request.urlopen(f"http://localhost:{port}/healthz", timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+          assert payload.get("status") == "ok", payload
+          PY

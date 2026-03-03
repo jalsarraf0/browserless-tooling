@@ -77,7 +77,7 @@ validate_name() {
 port_available() {
   local port="$1"
 
-  if ss -Htan "( sport = :${port} )" >/dev/null 2>&1; then
+  if ss -Htan "( sport = :${port} )" | grep -q .; then
     return 1
   fi
 
@@ -240,7 +240,9 @@ run_smoke_test() {
   local output="${downloads_dir}/smoke-test.png"
 
   curl -fsS --retry 5 --retry-delay 2 \
-    "http://localhost:${port}/screenshot?token=${token}&url=https://example.org" \
+    -X POST "http://localhost:${port}/chrome/screenshot?token=${token}" \
+    -H "content-type: application/json" \
+    --data '{"url":"https://example.org"}' \
     --output "${output}"
 
   local size

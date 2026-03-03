@@ -1,0 +1,72 @@
+name: Security CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+  schedule:
+    - cron: "30 4 * * 1"
+
+concurrency:
+  group: browserless-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  security-batches:
+    name: Security (${{ matrix.batch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        batch: ["secrets", "static"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        if: matrix.batch == 'secrets'
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install shell tooling
+        if: matrix.batch == 'static'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Static security checks
+        if: matrix.batch == 'static'
+        run: |
+          set -euo pipefail
+          bash -n aibrowse-setup.sh
+          bash -n browsewrap-setup.sh
+          shellcheck aibrowse-setup.sh browsewrap-setup.sh
+
+  codeql:
+    name: CodeQL (actions)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: actions
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3

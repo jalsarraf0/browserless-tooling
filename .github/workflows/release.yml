@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build release bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release bundle
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          ARCHIVE="browserless-tooling-${VERSION}.tar.gz"
+          tar -czf "${ARCHIVE}" aibrowse-setup.sh browsewrap-setup.sh README.md LICENSE
+          sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            browserless-tooling-*.tar.gz
+            browserless-tooling-*.tar.gz.sha256

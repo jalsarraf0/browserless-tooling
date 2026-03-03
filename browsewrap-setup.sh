@@ -78,7 +78,7 @@ validate_name() {
 port_available() {
   local port="$1"
 
-  if ss -Htan "( sport = :${port} )" >/dev/null 2>&1; then
+  if ss -Htan "( sport = :${port} )" | grep -q .; then
     return 1
   fi
 
