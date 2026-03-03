@@ -156,5 +156,5 @@ policy tooling, dashboards)? Open an issue or reach out through the repository.
   - `bash -n aibrowse-setup.sh browsewrap-setup.sh`
   - `sudo bash ./aibrowse-setup.sh <instance>` + metrics/smoke checks
   - `sudo bash ./browsewrap-setup.sh <instance>` + `/healthz` verification
-- CI/CD status: batched regression, security, and release workflows are defined.
+- CI/CD status: all tests passed on `main` (`Regression CI` run `22643543967`, `Security CI` run `22643543949`, `Regression and Security` run `22643543984`).
 - Security hygiene: PASS (no hardcoded secrets or private keys detected in tracked files).
