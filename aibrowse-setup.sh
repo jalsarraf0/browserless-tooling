@@ -12,6 +12,7 @@ readonly FIREWALL_ZONE="trusted"
 readonly SMOKE_TEST_SIZE_THRESHOLD=10240
 readonly SERVICE_HEALTH_ATTEMPTS=90
 readonly SERVICE_HEALTH_SLEEP=2
+readonly DEFAULT_SERVICE_HOST="localhost"
 
 log() {
   local level="$1"
@@ -220,12 +221,13 @@ start_stack() {
 }
 
 wait_for_service() {
-  local port="$1"
-  local token="$2"
+  local host="$1"
+  local port="$2"
+  local token="$3"
   local attempts="${SERVICE_HEALTH_ATTEMPTS}"
 
   while (( attempts > 0 )); do
-    if curl -fsS --max-time 5 "http://localhost:${port}/metrics?token=${token}" >/dev/null 2>&1; then
+    if curl -fsS --max-time 5 "http://${host}:${port}/metrics?token=${token}" >/dev/null 2>&1; then
       return 0
     fi
     sleep "${SERVICE_HEALTH_SLEEP}"
@@ -236,13 +238,14 @@ wait_for_service() {
 }
 
 run_smoke_test() {
-  local downloads_dir="$1"
-  local port="$2"
-  local token="$3"
+  local host="$1"
+  local downloads_dir="$2"
+  local port="$3"
+  local token="$4"
   local output="${downloads_dir}/smoke-test.png"
 
   curl -fsS --retry 5 --retry-delay 2 \
-    -X POST "http://localhost:${port}/chrome/screenshot?token=${token}" \
+    -X POST "http://${host}:${port}/chrome/screenshot?token=${token}" \
     -H "content-type: application/json" \
     --data '{"url":"https://example.org"}' \
     --output "${output}"
@@ -288,6 +291,7 @@ main() {
   local logs_dir="${instance_dir}/logs"
   local profiles_dir="${instance_dir}/profiles"
   local client_dir="${instance_dir}/client_examples"
+  local service_host="${SERVICE_HOST:-${DEFAULT_SERVICE_HOST}}"
 
   ensure_directories "${instance_dir}" "${downloads_dir}" "${logs_dir}" "${profiles_dir}" "${client_dir}"
 
@@ -320,11 +324,11 @@ main() {
   local project="aibrowse-${instance_name}"
   start_stack "${instance_dir}" "${project}"
 
-  if ! wait_for_service "${browserless_port}" "${browserless_token}"; then
+  if ! wait_for_service "${service_host}" "${browserless_port}" "${browserless_token}"; then
     fail "Browserless service failed health checks."
   fi
 
-  run_smoke_test "${downloads_dir}" "${browserless_port}" "${browserless_token}"
+  run_smoke_test "${service_host}" "${downloads_dir}" "${browserless_port}" "${browserless_token}"
 
   log_info "Browserless instance ${instance_name} is ready on port ${browserless_port}."
   log_info "Credentials stored in ${instance_dir}/.env (permissions 0640)."

@@ -49,6 +49,10 @@ jobs:
           sudo apt-get install -y iproute2
 
           INSTANCE="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          SERVICE_HOST="localhost"
+          if [ -f /.dockerenv ]; then
+            SERVICE_HOST="$(ip route | awk '/default/ {print $3; exit}')"
+          fi
 
           cleanup() {
             sudo docker rm -f "browserless-${INSTANCE}" >/dev/null 2>&1 || true
@@ -57,19 +61,19 @@ jobs:
           }
           trap cleanup EXIT
 
-          sudo bash ./aibrowse-setup.sh "${INSTANCE}"
+          sudo env SERVICE_HOST="${SERVICE_HOST}" bash ./aibrowse-setup.sh "${INSTANCE}"
 
           AIBROWSE_ENV="/docker/aibrowse/${INSTANCE}/.env"
           BROWSERLESS_PORT="$(sudo grep '^BROWSERLESS_PORT=' "${AIBROWSE_ENV}" | cut -d= -f2-)"
           BROWSERLESS_TOKEN="$(sudo grep '^BROWSERLESS_TOKEN=' "${AIBROWSE_ENV}" | cut -d= -f2-)"
 
-          curl -fsS "http://localhost:${BROWSERLESS_PORT}/metrics?token=${BROWSERLESS_TOKEN}" >/dev/null
+          curl -fsS "http://${SERVICE_HOST}:${BROWSERLESS_PORT}/metrics?token=${BROWSERLESS_TOKEN}" >/dev/null
 
           SMOKE_IMG="/docker/aibrowse/${INSTANCE}/downloads/smoke-test.png"
           test -f "${SMOKE_IMG}"
           test "$(stat -c '%s' "${SMOKE_IMG}")" -gt 1024
 
-          sudo bash ./browsewrap-setup.sh "${INSTANCE}"
+          sudo env SERVICE_HOST="${SERVICE_HOST}" bash ./browsewrap-setup.sh "${INSTANCE}"
 
           WRAP_ENV="/docker/browsewrap/${INSTANCE}/.env"
           WRAPPER_PORT="$(sudo grep '^WRAPPER_PORT=' "${WRAP_ENV}" | cut -d= -f2-)"
@@ -77,8 +81,9 @@ jobs:
           import json
           import urllib.request
 
+          service_host = "${SERVICE_HOST}"
           port = "${WRAPPER_PORT}"
-          with urllib.request.urlopen(f"http://localhost:{port}/healthz", timeout=10) as response:
+          with urllib.request.urlopen(f"http://{service_host}:{port}/healthz", timeout=10) as response:
             payload = json.loads(response.read().decode("utf-8"))
           assert payload.get("status") == "ok", payload
           PY

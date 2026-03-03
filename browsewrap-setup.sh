@@ -11,6 +11,7 @@ readonly PORT_MAX=58999
 readonly MAX_PORT_ATTEMPTS=25
 readonly FIREWALL_ZONE="trusted"
 readonly NODE_VERSION="22-bookworm-slim"
+readonly DEFAULT_SERVICE_HOST="localhost"
 
 log() {
   local level="$1"
@@ -300,11 +301,12 @@ configure_firewalld() {
 }
 
 wait_for_wrapper() {
-  local port="$1"
+  local host="$1"
+  local port="$2"
   local attempts=30
 
   while (( attempts > 0 )); do
-    if curl -fsS --max-time 5 "http://localhost:${port}/healthz" >/dev/null 2>&1; then
+    if curl -fsS --max-time 5 "http://${host}:${port}/healthz" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -373,6 +375,7 @@ main() {
   local instance_dir="${ROOT_DIR}/${instance_name}"
   local logs_dir="${instance_dir}/logs"
   local app_dir="${instance_dir}/app"
+  local service_host="${SERVICE_HOST:-${DEFAULT_SERVICE_HOST}}"
 
   ensure_directories "${instance_dir}" "${logs_dir}" "${app_dir}"
 
@@ -402,14 +405,14 @@ main() {
   local project="browsewrap-${instance_name}"
   start_stack "${instance_dir}" "${project}"
 
-  if ! wait_for_wrapper "${wrapper_port}"; then
+  if ! wait_for_wrapper "${service_host}" "${wrapper_port}"; then
     fail "Wrapper service failed health checks."
   fi
 
   update_mcp_config "${instance_name}" "${wrapper_port}" "${BROWSERLESS_TOKEN}"
 
   log_info "Wrapper ${instance_name} is ready on port ${wrapper_port}."
-  log_info "Health endpoint: http://localhost:${wrapper_port}/healthz"
+  log_info "Health endpoint: http://${service_host}:${wrapper_port}/healthz"
   log_info "Configuration stored in ${instance_dir}/.env"
 }
 
