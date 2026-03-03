@@ -378,7 +378,7 @@ main() {
 
   local wrapper_port
   if [[ -f "${instance_dir}/.env" ]]; then
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1090,SC1091
     source "${instance_dir}/.env"
     wrapper_port="${WRAPPER_PORT:-}"
     if [[ -z "${wrapper_port}" ]]; then
